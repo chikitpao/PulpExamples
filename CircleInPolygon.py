@@ -46,7 +46,8 @@ def get_constraint_from_edge(point1: tuple[float, float],
     return n.real * vars[0] + n.imag * vars[1] - n_norm * vars[2] >= n.real \
         * point1[0] + n.imag * point1[1]
 
-def calculate_result(points: list[float]) -> tuple[float, float, float]:
+def calculate_result(points: list[tuple[float, float]]) \
+        -> tuple[float, float, float]:
     """ Returns u, v, r. Can be None if no result is found. """
     # Close the polygon
     points.append(points[0])
@@ -80,7 +81,8 @@ def calculate_result(points: list[float]) -> tuple[float, float, float]:
         return None, None, None
 
 
-def plot_result(points: list[float], u: float = None, v: float = None, r: float = None):
+def plot_result(points: list[tuple[float, float]], u: float = None, 
+    v: float = None, r: float = None):
     fig, axes = plt.subplots()
 
     # Unpack all x and y values
@@ -111,7 +113,7 @@ def plot_result(points: list[float], u: float = None, v: float = None, r: float 
     plt.title(result)
 
     plt.plot(all_x, all_y)
-    fig.canvas.set_window_title('Circle in Polygon')
+    fig.canvas.manager.set_window_title('Circle in Polygon')
     plt.show()
 
 
