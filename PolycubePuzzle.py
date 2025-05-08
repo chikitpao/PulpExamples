@@ -116,7 +116,7 @@ def get_tranformations(polycube:np.ndarray) -> list[np.ndarray]:
 def main():
     start_time = time.time()
 
-    # Soma polycubes are described in top view.
+    # Polycubes are described in top view.
     # Bottom -> Bit 0
     # Middle -> Bit 1
     # Top -> Bit 2
@@ -130,7 +130,7 @@ def main():
 
     print(f"transformation count: {len(transformations)}")
 
-# Objective: find maximum radius
+    # Objective: Find exactly 9 transformations of a polycube piece to form a 3x3 cube.
     problem = plp.LpProblem(f'FindSolution', plp.LpMaximize)
     lp_sum = plp.LpVariable('lp_sum', 9, 9)
     problem += lp_sum
@@ -139,9 +139,11 @@ def main():
     lp_transfrom = [plp.LpVariable(f'lp_tr{i}', 0, 1, cat = "Binary") for i in range(len(transformations))]
 
     # Constraints:
-    # 1: ...
+    # 1: Sum is the number of transformations used.
     lp_sum = sum(lp_transfrom)
-    # 2: ...
+    # 2: Examine each sub-cube of the 3x3 cube separately. Express its value as the sum of transformations
+    # which occupies that sub-cube. The sum must be exactly 1 since each sub-cube can be occupied by only
+    # one transformation.
     for i in range(27):
         used = []
         for tr_no, tr in enumerate(transformations):
@@ -151,7 +153,7 @@ def main():
     status = problem.solve(plp.PULP_CBC_CMD(msg=False))
     
     print(f'status: {status}')
-    # Remark: Use either problem.objective.value() or lp_r.value() since they 
+    # Remark: Use either problem.objective.value() or lp_sum.value() since they 
     # are the same.
     if status != 1:
         print("No solution found!")
