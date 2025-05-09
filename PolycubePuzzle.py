@@ -1,13 +1,21 @@
 """  
-    Solves polycube puzzle with identical pieces.
+    Solves polycube puzzle either with identical pieces or different pieces.
 
     Author: Chi-Kit Pao
     REMARK: Requires library PuLP and NumPy to run this program.
+    USAGE:
+    # 1: Solving puzzle with identical pieces
+    # - Change the puzzle of variable "raw_polycube" in function "main", if necessary.
+    # - Run the program either without option or with option "--single".
+    # 2: Solving puzzle with different pieces
+    # - Change the puzzle of variable "raw_polycubes" in function "main", if necessary.
+    # - Run the program with option "--multiple".
 """
 
 import itertools
 import numpy as np
 import pulp as plp
+import sys
 import time
 
 
@@ -113,18 +121,7 @@ def get_transformations(polycube:np.ndarray) -> list[np.ndarray]:
 
     return result
 
-def main():
-    start_time = time.time()
-
-    # Polycubes are described in top view.
-    # Bottom -> Bit 0
-    # Middle -> Bit 1
-    # Top -> Bit 2
-    raw_polycube = [
-         [1, 1, 0],
-         [1, 0, 0],
-         [0, 0, 0]]
-
+def solve_single(raw_polycube):
     polycube = build_polycube(raw_polycube)
     transformations = get_transformations(polycube)
 
@@ -132,15 +129,16 @@ def main():
 
     # Objective: Find exactly 9 transformations of a polycube piece to form a 3x3 cube.
     problem = plp.LpProblem(f'FindSolution', plp.LpMaximize)
-    lp_sum = plp.LpVariable('lp_sum', 9, 9)
+    lp_sum = plp.LpVariable('lp_sum', 0, 9, cat = "Integer")
     problem += lp_sum
 
     # Other decision variables: transformation used
-    lp_transfrom = [plp.LpVariable(f'lp_tr{i}', 0, 1, cat = "Binary") for i in range(len(transformations))]
+    lp_transform = [plp.LpVariable(f'lp_tr{i}', 0, 1, cat = "Binary") for i in range(len(transformations))]
 
     # Constraints:
-    # 1: Sum is the number of transformations used.
-    lp_sum = sum(lp_transfrom)
+    # 1: Sum is the number of transformations used and must be <= 9.
+    lp_sum = sum(lp_transform)
+    problem += lp_sum <= 9
     # 2: Examine each sub-cube of the 3x3 cube separately. Express its value as the sum of transformations
     # which occupies that sub-cube. The sum must be exactly 1 since each sub-cube can be occupied by only
     # one transformation.
@@ -148,91 +146,283 @@ def main():
         used = []
         for tr_no, tr in enumerate(transformations):
             if tr[i // 9, (i // 3) % 3, i % 3] == 1:
-                used.append(lp_transfrom[tr_no])
+                used.append(lp_transform[tr_no])
         problem += 1 == sum(used)
+
     status = problem.solve(plp.PULP_CBC_CMD(msg=False))
-    
     print(f'status: {status}')
+
     # Remark: Use either problem.objective.value() or lp_sum.value() since they 
     # are the same.
     if status != 1:
-        print("No solution found!")
+        print(f"No solution found!")
     else:  # (1 = OPTIMAL)
         print(f"{lp_sum.value()}")
         assert lp_sum.value() == 9.0
         
         result = []
-        for i, tr in enumerate(lp_transfrom):
-            if lp_transfrom[i].value() > 0:
-                print(i, lp_transfrom[i].value())
+        for i, tr in enumerate(lp_transform):
+            if lp_transform[i].value() > 0:
+                print(i, lp_transform[i].value())
                 result.append(transformations[i])
 
         print("Result:")
         print(result)
         print(sum([i * r for i, r in enumerate(result)]))
+
+def solve_multiple(raw_polycubes):
+    polycubes = [build_polycube(rp) for rp in raw_polycubes]
+
+    transformations = []
+    for i, pc in enumerate(polycubes):
+        transformations.append(get_transformations(pc))
+
+    print(f"transformation count: {sum(map(len, transformations))}")
+    print(f"{list(map(len, transformations))}")
+
+    # Objective: Find transformation for every polycube so they form a 3x3 cube.
+    problem = plp.LpProblem(f'FindSolution', plp.LpMaximize)
+    lp_sum = plp.LpVariable('lp_sum', 0, 9, cat = "Integer")
+    problem += lp_sum
+
+    # Other decision variables:
+    lp_transform_used = []
+    # lp_transform = []
+    for i, transformation_list in enumerate(transformations):
+        # index of transformation used by every polycube, i = polycube, j = index of transformation
+        lp_transform_used.append([plp.LpVariable(f'used{i}_{j}', 0, 1, cat = "Binary") for j in range(len(transformation_list))])
+        # # possible transformations for every polycube
+        # lp_transform.append([plp.LpVariable(f'tr{i}_{j}', 0, 1, cat = "Binary") for j in range(len(transformation_list))])
+
+    # Constraints:
+    # 1: Sum is the number of transformations used and must be <= 9.
+    for used in lp_transform_used:
+        lp_sum += sum(used)
+    problem += lp_sum <= 9
+    # 2: We can only use one transformation of every polycube.
+    for pc_no, pc_used_transform_list in enumerate(lp_transform_used):
+        problem += 1 == sum(pc_used_transform_list)
+    # 2: Examine each sub-cube of the 3x3 cube separately. Express its value as the sum of polycubes
+    # which occupies that sub-cube. The sum must be exactly 1 since each sub-cube can be occupied by only
+    # one polycube.
+    for i in range(27):
+        used = []
+        for pc_no, tr_list in enumerate(transformations):
+            for tr_no, tr in enumerate(tr_list):
+                if tr[i // 9, (i // 3) % 3, i % 3] == 1:
+                    used.append(lp_transform_used[pc_no][tr_no])
+        problem += 1 == sum(used)
     
+    status = problem.solve(plp.PULP_CBC_CMD(msg=False))
+    print(f'status: {status}')
+
+    # Remark: Use either problem.objective.value() or lp_sum.value() since they 
+    # are the same.
+    if status != 1:
+        print(f"No solution found!")
+    else:  # (1 = OPTIMAL)
+        print(f"{lp_sum.value()}")
+        assert lp_sum.value() == 9.0
+        
+        result = []
+        for i, used in enumerate(lp_transform_used):
+            for j, transform in enumerate(used):
+                if transform.value() > 0:
+                    print(i, j, transform.value())
+                    result.append(transformations[i][j])
+
+        print("Result:")
+        print(result)
+        print(sum([i * r for i, r in enumerate(result)]))
+
+def main():
+    start_time = time.time()
+    single = True
+
+    for arg in sys.argv[1:]:
+        if arg == "--single":
+            single = True
+        elif arg == "--multiple":
+            single = False
+        else:
+            print("Invalid argument!")
+            return
+
+    if single:
+        # Polycubes are described in top view.
+        # Bottom -> Bit 0
+        # Middle -> Bit 1
+        # Top -> Bit 2
+        raw_polycube = [
+            [1, 1, 0],
+            [1, 0, 0],
+            [0, 0, 0]]
+        solve_single(raw_polycube)
+    else:
+        # Polycubes are described in top view.
+        # Bottom -> Bit 0
+        # Middle -> Bit 1
+        # Top -> Bit 2
+        raw_polycubes = [
+            [[1, 1, 0],
+            [3, 0, 0],
+            [1, 0, 0]],
+            [[1, 0, 0],
+            [1, 1, 0],
+            [1, 0, 0]],
+            [[1, 3, 0],
+            [0, 1, 1],
+            [0, 0, 0]],
+            [[1, 0, 0],
+            [1, 3, 0],
+            [1, 0, 0]],
+            [[1, 3, 0],
+            [1, 0, 0],
+            [0, 0, 0]],
+            [[1, 1, 0],
+            [0, 1, 0],
+            [0, 1, 0]]
+        ]
+        solve_multiple(raw_polycubes)
+
     print(f"Time elapsed: {time.time() - start_time} s")
 
 if __name__ == '__main__':
     main()
 
-# Output:
+##### Output (option "--single"):
 # transformation count: 144
 # status: 1
 # 9.0
-# 20 1.0
-# 27 1.0
-# 47 1.0
-# 48 1.0
-# 56 1.0
-# 73 1.0
-# 82 1.0
-# 88 1.0
-# 113 1.0
+# 3 1.0
+# 18 1.0
+# 57 1.0
+# 75 1.0
+# 84 1.0
+# 105 1.0
+# 118 1.0
+# 133 1.0
+# 143 1.0
 # Result:
-# [array([[[0, 0, 0],
+# [array([[[0, 1, 1],
+#         [0, 1, 0],
+#         [0, 0, 0]],
+
+#        [[0, 0, 0],
 #         [0, 0, 0],
 #         [0, 0, 0]],
 
 #        [[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]]]), array([[[0, 0, 0],
+#         [1, 0, 0],
+#         [1, 1, 0]],
+
+#        [[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]],
+
+#        [[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]]]), array([[[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]],
+
+#        [[0, 0, 0],
+#         [0, 0, 0],
+#         [1, 1, 0]],
+
+#        [[0, 0, 0],
+#         [0, 0, 0],
+#         [1, 0, 0]]]), array([[[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]],
+
+#        [[0, 0, 1],
+#         [0, 0, 0],
+#         [0, 0, 0]],
+
+#        [[0, 1, 1],
+#         [0, 0, 0],
+#         [0, 0, 0]]]), array([[[1, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]],
+
+#        [[1, 1, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]],
+
+#        [[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]]]), array([[[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]],
+
+#        [[0, 0, 0],
+#         [0, 1, 0],
+#         [0, 0, 0]],
+
+#        [[0, 0, 0],
+#         [0, 1, 0],
+#         [0, 1, 0]]]), array([[[0, 0, 0],
+#         [0, 0, 1],
+#         [0, 0, 1]],
+
+#        [[0, 0, 0],
+#         [0, 0, 1],
+#         [0, 0, 0]],
+
+#        [[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]]]), array([[[0, 0, 0],
 #         [0, 0, 0],
 #         [0, 0, 0]],
 
 #        [[0, 0, 0],
 #         [1, 0, 0],
-#         [1, 1, 0]]]), array([[[0, 0, 1],
-#         [0, 1, 1],
-#         [0, 0, 0]],
-
-#        [[0, 0, 0],
-#         [0, 0, 0],
-#         [0, 0, 0]],
-
-#        [[0, 0, 0],
-#         [0, 0, 0],
-#         [0, 0, 0]]]), array([[[0, 0, 0],
-#         [0, 0, 0],
-#         [0, 0, 0]],
-
-#        [[0, 0, 0],
-#         [0, 0, 0],
-#         [0, 0, 0]],
-
-#        [[0, 0, 0],
-#         [0, 1, 1],
-#         [0, 0, 1]]]), array([[[1, 1, 0],
-#         [0, 0, 0],
 #         [0, 0, 0]],
 
 #        [[1, 0, 0],
+#         [1, 0, 0],
+#         [0, 0, 0]]]), array([[[0, 0, 0],
 #         [0, 0, 0],
 #         [0, 0, 0]],
 
 #        [[0, 0, 0],
 #         [0, 0, 0],
-#         [0, 0, 0]]]), array([[[0, 0, 0],
-#         [0, 0, 0],
-#         [1, 1, 0]],
+#         [0, 0, 1]],
+
+#        [[0, 0, 0],
+#         [0, 0, 1],
+#         [0, 0, 1]]])]
+# [[[4 0 0]
+#   [1 0 6]
+#   [1 1 6]]
+
+#  [[4 4 3]
+#   [7 5 6]
+#   [2 2 8]]
+
+#  [[7 3 3]
+#   [7 5 8]
+#   [2 5 8]]]
+# Time elapsed: 0.18631386756896973 s
+
+##### Output (option --multiple):
+# transformation count: 600
+# [96, 72, 96, 96, 96, 144]
+# status: 1
+# 9.0
+# 0 72 1.0
+# 1 42 1.0
+# 2 95 1.0
+# 3 31 1.0
+# 4 89 1.0
+# 5 75 1.0
+# Result:
+# [array([[[1, 0, 0],
+#         [1, 1, 0],
+#         [1, 0, 0]],
 
 #        [[0, 0, 0],
 #         [0, 0, 0],
@@ -240,56 +430,66 @@ if __name__ == '__main__':
 
 #        [[0, 0, 0],
 #         [0, 0, 0],
-#         [0, 0, 0]]]), array([[[0, 0, 0],
+#         [0, 0, 0]]]), array([[[0, 1, 0],
 #         [0, 0, 0],
 #         [0, 0, 0]],
 
-#        [[0, 1, 0],
+#        [[1, 1, 1],
 #         [0, 0, 0],
 #         [0, 0, 0]],
-
-#        [[1, 1, 0],
-#         [0, 0, 0],
-#         [0, 0, 0]]]), array([[[0, 0, 0],
-#         [0, 0, 0],
-#         [0, 0, 1]],
 
 #        [[0, 0, 0],
 #         [0, 0, 0],
+#         [0, 0, 0]]]), array([[[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]],
+
+#        [[0, 0, 0],
+#         [0, 0, 1],
+#         [0, 0, 1]],
+
+#        [[0, 0, 1],
+#         [0, 1, 1],
+#         [0, 0, 0]]]), array([[[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]],
+
+#        [[0, 0, 0],
+#         [0, 1, 0],
+#         [0, 1, 0]],
+
+#        [[0, 0, 0],
+#         [0, 0, 0],
+#         [1, 1, 1]]]), array([[[0, 0, 0],
+#         [0, 0, 0],
+#         [0, 0, 0]],
+
+#        [[0, 0, 0],
+#         [1, 0, 0],
+#         [0, 0, 0]],
+
+#        [[1, 1, 0],
+#         [1, 0, 0],
+#         [0, 0, 0]]]), array([[[0, 0, 1],
+#         [0, 0, 1],
 #         [0, 1, 1]],
 
 #        [[0, 0, 0],
 #         [0, 0, 0],
-#         [0, 0, 0]]]), array([[[0, 0, 0],
-#         [1, 0, 0],
 #         [0, 0, 0]],
 
 #        [[0, 0, 0],
-#         [1, 1, 0],
-#         [0, 0, 0]],
-
-#        [[0, 0, 0],
-#         [0, 0, 0],
-#         [0, 0, 0]]]), array([[[0, 0, 0],
-#         [0, 0, 0],
-#         [0, 0, 0]],
-
-#        [[0, 0, 1],
-#         [0, 0, 1],
-#         [0, 0, 0]],
-
-#        [[0, 0, 1],
 #         [0, 0, 0],
 #         [0, 0, 0]]])]
-# [[[3 3 1]
-#   [7 1 1]
-#   [4 4 6]]
+# [[[0 1 5]
+#   [0 0 5]
+#   [0 5 5]]
 
-#  [[3 5 8]
-#   [7 7 8]
-#   [4 6 6]]
+#  [[1 1 1]
+#   [4 3 2]
+#   [0 3 2]]
 
-#  [[5 5 8]
-#   [0 2 2]
-#   [0 0 2]]]
-# Time elapsed: 0.23205232620239258 s
+#  [[4 4 2]
+#   [4 2 2]
+#   [3 3 3]]]
+# Time elapsed: 0.45742034912109375 s
