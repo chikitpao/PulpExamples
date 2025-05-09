@@ -76,7 +76,7 @@ def get_rotations(polycube:np.ndarray) -> list[np.ndarray]:
 
     return result
 
-def get_tranformations(polycube:np.ndarray) -> list[np.ndarray]:
+def get_transformations(polycube:np.ndarray) -> list[np.ndarray]:
     # REMARK: 'numpy.ndarray' is not hashable, so put it into a
     # set will cause error:
     # TypeError: unhashable type: 'numpy.ndarray'
@@ -126,7 +126,7 @@ def main():
          [0, 0, 0]]
 
     polycube = build_polycube(raw_polycube)
-    transformations = get_tranformations(polycube)
+    transformations = get_transformations(polycube)
 
     print(f"transformation count: {len(transformations)}")
 
