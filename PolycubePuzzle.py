@@ -2,7 +2,7 @@
     Solves polycube puzzle either with identical pieces or different pieces.
 
     Author: Chi-Kit Pao
-    REMARK: Requires library PuLP and NumPy to run this program.
+    REMARK: Requires library PuLP, Matplotlib and NumPy to run this program.
     USAGE:
     # 1: Solving puzzle with identical pieces
     # - Change the puzzle of variable "raw_polycube" in function "main", if necessary.
@@ -13,6 +13,7 @@
 """
 
 import itertools
+from matplotlib import pyplot as plt
 import numpy as np
 import pulp as plp
 import sys
@@ -121,6 +122,77 @@ def get_transformations(polycube:np.ndarray) -> list[np.ndarray]:
 
     return result
 
+def plot_polycube(fig, ax, i, pc):
+    r = [0,1]
+    alpha_ = 0.1
+    wire_color = 'k'
+    linewidth_ = 1
+    colors = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'purple', 'pink', 'w']
+    color_ = colors[i]
+
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_zlabel("z")
+
+    for posx, posy, posz in itertools.product(list(range(3)), repeat=3):
+        if pc[posz, posx, posy] != 1:
+            continue
+
+        X, Y = np.meshgrid(r, r)
+        one = np.array([[1, 1]])
+        X_ = X+posx
+        Y_ = Y+posy
+        Z1_ = X+posz
+        Z2_ = Y+posz
+
+        # REMARK: Don't draw inner surfaces.
+        # bottom and top
+        if posz == 0 or pc[posz-1][posx][posy] != 1:
+            ax.plot_surface(X_, Y_, one*posz, alpha=alpha_, color=color_)
+        ax.plot_wireframe(X_, Y_, one*posz, color=wire_color, linewidth=linewidth_)
+        if posz == 2 or pc[posz+1][posx][posy] != 1:
+            ax.plot_surface(X_, Y_, one*(posz+1), alpha=alpha_, color=color_)
+        ax.plot_wireframe(X_, Y_, one*(posz+1), color=wire_color, linewidth=linewidth_)
+        # left and right
+        if posx == 0 or pc[posz][posx-1][posy] != 1:
+            ax.plot_surface(one*posx, Y_, Z1_, alpha=alpha_, color=color_)
+        ax.plot_wireframe(one*posx, Y_, Z1_, color=wire_color, linewidth=linewidth_)
+        if posx == 2 or pc[posz][posx+1][posy] != 1:
+            ax.plot_surface(one*(posx+1), Y_, Z1_, alpha=alpha_, color=color_)
+        ax.plot_wireframe(one*(posx+1), Y_, Z1_, color=wire_color, linewidth=linewidth_)
+        # front and back
+        if posy == 0 or pc[posz][posx][posy-1] != 1:
+            ax.plot_surface(X_, one*posy, Z2_, alpha=alpha_, color=color_)
+        ax.plot_wireframe(X_, one*posy, Z2_, color=wire_color, linewidth=linewidth_)
+        if posy == 2 or pc[posz][posx][posy+1] != 1:
+            ax.plot_surface(X_, one*(posy+1), Z2_, alpha=alpha_, color=color_)
+        ax.plot_wireframe(X_, one*(posy+1), Z2_, color=wire_color, linewidth=linewidth_)
+
+def plot_result(result):
+    if not result:
+        return
+    length = len(result)
+
+    d, m = divmod(length, 3)
+    row_count = d if m == 0 else (d + 1)
+    fig = plt.figure()
+    #fig, axes = plt.subplots(row_count, 3)
+    #print(f"{fig=}")
+    #print(f"{axes=}")
+    for i, pc in enumerate(result):
+        ax = fig.add_subplot(row_count, 3, i + 1, projection='3d')
+        # ax.set_aspect('equal', adjustable='box')
+        ax.set_box_aspect([1,1,1])
+        ax.set_xlim3d([0.0, 3.25])
+        ax.set_ylim3d([0.0, 3.25])
+        ax.set_zlim3d([0.0, 3.25])
+        plot_polycube(fig, ax, i, pc)
+
+    title = "Polycube Puzzle"
+    fig.suptitle(title)
+    fig.canvas.manager.set_window_title(title)
+    plt.show()
+
 def solve_single(raw_polycube):
     polycube = build_polycube(raw_polycube)
     transformations = get_transformations(polycube)
@@ -156,6 +228,7 @@ def solve_single(raw_polycube):
     # are the same.
     if status != 1:
         print(f"No solution found!")
+        return []
     else:  # (1 = OPTIMAL)
         print(f"{lp_sum.value()}")
         assert lp_sum.value() == 9.0
@@ -169,6 +242,7 @@ def solve_single(raw_polycube):
         print("Result:")
         print(result)
         print(sum([i * r for i, r in enumerate(result)]))
+        return result
 
 def solve_multiple(raw_polycubes):
     polycubes = [build_polycube(rp) for rp in raw_polycubes]
@@ -220,6 +294,7 @@ def solve_multiple(raw_polycubes):
     # are the same.
     if status != 1:
         print(f"No solution found!")
+        return []
     else:  # (1 = OPTIMAL)
         print(f"{lp_sum.value()}")
         assert lp_sum.value() == 9.0
@@ -234,6 +309,7 @@ def solve_multiple(raw_polycubes):
         print("Result:")
         print(result)
         print(sum([i * r for i, r in enumerate(result)]))
+        return result
 
 def main():
     start_time = time.time()
@@ -248,6 +324,7 @@ def main():
             print("Invalid argument!")
             return
 
+    result = []
     if single:
         # Polycubes are described in top view.
         # Bottom -> Bit 0
@@ -257,7 +334,7 @@ def main():
             [1, 1, 0],
             [1, 0, 0],
             [0, 0, 0]]
-        solve_single(raw_polycube)
+        result = solve_single(raw_polycube)
     else:
         # Polycubes are described in top view.
         # Bottom -> Bit 0
@@ -283,9 +360,11 @@ def main():
             [0, 1, 0],
             [0, 1, 0]]
         ]
-        solve_multiple(raw_polycubes)
-
+        result = solve_multiple(raw_polycubes)
+    
     print(f"Time elapsed: {time.time() - start_time} s")
+    
+    plot_result(result)
 
 if __name__ == '__main__':
     main()

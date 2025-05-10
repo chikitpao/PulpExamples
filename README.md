@@ -14,6 +14,8 @@ File list
 - **CircleInPolygon.py**: Calculate circle with maximum area within a specified polygon.
 - **CircleInPolygon_Screenshot.png**: Screenshot of program CircleInPolygon.py.
 - **PolycubePuzzle.py**: Solve polycube puzzle either with identical pieces or different pieces.
+- **PolycubePuzzleMultiple.py**: Solution plot for program PolycubePuzzle.py with option "--single".
+- **PolycubePuzzleSingle.py**: Solution plot for program PolycubePuzzle.py with option "--multiple".
 - **SimpleClassifier.py**: Calculate classifier for data with two variables.
 - **SimpleClassifier_Screenshot1.png**: Screenshot of program SimpleClassifier.py when clear classification is possible.
 - **SimpleClassifier_Screenshot2.png**: Screenshot of program SimpleClassifier.py when clear classification is not possible.
