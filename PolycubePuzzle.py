@@ -276,7 +276,7 @@ def solve_multiple(raw_polycubes):
     # 2: We can only use one transformation of every polycube.
     for pc_no, pc_used_transform_list in enumerate(lp_transform_used):
         problem += 1 == sum(pc_used_transform_list)
-    # 2: Examine each sub-cube of the 3x3 cube separately. Express its value as the sum of polycubes
+    # 3: Examine each sub-cube of the 3x3 cube separately. Express its value as the sum of polycubes
     # which occupies that sub-cube. The sum must be exactly 1 since each sub-cube can be occupied by only
     # one polycube.
     for i in range(27):
