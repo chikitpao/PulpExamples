@@ -198,19 +198,21 @@ def solve_single(raw_polycube):
     transformations = get_transformations(polycube)
 
     print(f"transformation count: {len(transformations)}")
+    polycube_count, r = divmod(27, np.count_nonzero(polycube))
+    assert r == 0
 
     # Objective: Find exactly 9 transformations of a polycube piece to form a 3x3 cube.
     problem = plp.LpProblem(f'FindSolution', plp.LpMaximize)
-    lp_sum = plp.LpVariable('lp_sum', 0, 9, cat = "Integer")
+    lp_sum = plp.LpVariable('lp_sum', 0, polycube_count, cat = "Integer")
     problem += lp_sum
 
     # Other decision variables: transformation used
     lp_transform = [plp.LpVariable(f'lp_tr{i}', 0, 1, cat = "Binary") for i in range(len(transformations))]
 
     # Constraints:
-    # 1: Sum is the number of transformations used and must be <= 9.
-    lp_sum = sum(lp_transform)
-    problem += lp_sum <= 9
+    # 1: Sum is the number of transformations used and must be <= polycube_count.
+    problem += lp_sum == sum(lp_transform)
+    problem += lp_sum <= polycube_count
     # 2: Examine each sub-cube of the 3x3 cube separately. Express its value as the sum of transformations
     # which occupies that sub-cube. The sum must be exactly 1 since each sub-cube can be occupied by only
     # one transformation.
@@ -230,8 +232,11 @@ def solve_single(raw_polycube):
         print(f"No solution found!")
         return []
     else:  # (1 = OPTIMAL)
-        print(f"{lp_sum.value()}")
-        assert lp_sum.value() == 9.0
+        print(f"{lp_sum.name=}")
+        print(f"{lp_sum.value()=}")
+        print(f"{problem.objective.name=}")
+        print(f"{problem.objective.value()=}")
+        assert lp_sum.value() == polycube_count
         
         result = []
         for i, tr in enumerate(lp_transform):
@@ -254,25 +259,23 @@ def solve_multiple(raw_polycubes):
     print(f"transformation count: {sum(map(len, transformations))}")
     print(f"{list(map(len, transformations))}")
 
+    polycube_count = len(polycubes)
+
     # Objective: Find transformation for every polycube so they form a 3x3 cube.
     problem = plp.LpProblem(f'FindSolution', plp.LpMaximize)
-    lp_sum = plp.LpVariable('lp_sum', 0, 9, cat = "Integer")
+    lp_sum = plp.LpVariable('lp_sum', 0, polycube_count, cat = "Integer")
     problem += lp_sum
 
     # Other decision variables:
     lp_transform_used = []
-    # lp_transform = []
     for i, transformation_list in enumerate(transformations):
         # index of transformation used by every polycube, i = polycube, j = index of transformation
         lp_transform_used.append([plp.LpVariable(f'used{i}_{j}', 0, 1, cat = "Binary") for j in range(len(transformation_list))])
-        # # possible transformations for every polycube
-        # lp_transform.append([plp.LpVariable(f'tr{i}_{j}', 0, 1, cat = "Binary") for j in range(len(transformation_list))])
 
     # Constraints:
-    # 1: Sum is the number of transformations used and must be <= 9.
-    for used in lp_transform_used:
-        lp_sum += sum(used)
-    problem += lp_sum <= 9
+    # 1: Sum is the number of transformations used and must be <= polycube_count.
+    problem += lp_sum == sum([b for a in lp_transform_used for b in a])
+    problem += lp_sum <= polycube_count
     # 2: We can only use one transformation of every polycube.
     for pc_no, pc_used_transform_list in enumerate(lp_transform_used):
         problem += 1 == sum(pc_used_transform_list)
@@ -296,8 +299,11 @@ def solve_multiple(raw_polycubes):
         print(f"No solution found!")
         return []
     else:  # (1 = OPTIMAL)
-        print(f"{lp_sum.value()}")
-        assert lp_sum.value() == 9.0
+        print(f"{lp_sum.name=}")
+        print(f"{lp_sum.value()=}")
+        print(f"{problem.objective.name=}")
+        print(f"{problem.objective.value()=}")
+        assert lp_sum.value() == polycube_count
         
         result = []
         for i, used in enumerate(lp_transform_used):
