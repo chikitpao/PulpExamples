@@ -28,6 +28,7 @@ sudoku = ["030000000",
 class Sudoku:
     def __init__(self, lines):
         self.lines = []
+        self.input_coordinates = set()
         for line in lines:
             self.lines.append(list(map(lambda c: ord(c) - ord('0'), line)))
 
@@ -54,6 +55,7 @@ class Sudoku:
             for j in range(0, 9):
                 input_value = self.lines[i][j]
                 if input_value != 0:
+                    self.input_coordinates.add((i, j))
                     # Add constraint: Set lp variables of known values
                     for v in range(1, 10):
                         problem += lp_var_cells[i][j][v-1] == (1 if v == input_value else 0)
@@ -96,7 +98,8 @@ def plot_sudoku(s):
     fig, ax = plt.subplots()
     max_num = 9
     for i, j in itertools.product(list(range(0,max_num)), repeat=2):
-        ax.text(i+0.5,j+0.5,str(s.lines[8-j][i]), ha='center', va='center')
+        color_ = 'k' if (i, j) in s.input_coordinates else 'r'
+        ax.text(i+0.5,j+0.5,str(s.lines[8-j][i]), ha='center', va='center', color=color_)
 
     ax.axis([0, max_num, 0, max_num])
     for axis in [ax.xaxis, ax.yaxis]:
@@ -105,8 +108,12 @@ def plot_sudoku(s):
         axis.set_ticklabels("")
 
     for i in range(max_num):
-        ax.axhline(y=(i))
-        ax.axvline(x=(i))
+        if i % 3 != 0:
+            ax.axhline(y=(i), color='tab:blue')
+            ax.axvline(x=(i), color='tab:blue')
+    for i in (3, 6):
+        ax.axhline(y=(i), color='k', linewidth=3)
+        ax.axvline(x=(i), color='k', linewidth=3)
 
     title = "Sudoku"
     fig.suptitle(title)
